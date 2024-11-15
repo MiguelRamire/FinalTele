@@ -4,4 +4,4 @@ services:
     build: ./servicio01/
     ports:
       - "80:80"
-      - "22:22"
+    
