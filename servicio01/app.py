@@ -1,136 +1,131 @@
-import pygame
-import random
+from flask import Flask
 
-# Inicialización de Pygame
-pygame.init()
+app = Flask(__name__)
 
-# Configuración de colores
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-BLUE = (0, 0, 255)
-GREEN = (0, 255, 0)
+@app.route("/")
+def home():
+    return """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Flappy Bird</title>
+        <style>
+            body {
+                margin: 0;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                background-color: #f0f0f0;
+            }
+            canvas {
+                border: 2px solid black;
+                background-color: white;
+            }
+        </style>
+    </head>
+    <body>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        <script>
+            const canvas = document.getElementById("gameCanvas");
+            const ctx = canvas.getContext("2d");
 
-# Configuración de la pantalla
-SCREEN_WIDTH = 400
-SCREEN_HEIGHT = 600
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Flappy Bird")
+            const bird = { x: 50, y: canvas.height / 2, width: 30, height: 30, velocity: 0 };
+            const gravity = 1;
+            const jumpStrength = -10;
 
-# Variables del juego
-bird_x = 50
-bird_y = SCREEN_HEIGHT // 2
-bird_width = 30
-bird_height = 30
-gravity = 1
-bird_velocity = 0
-jump_strength = -10
+            const pipes = [];
+            const pipeWidth = 60;
+            const pipeGap = 150;
+            let pipeFrequency = 90; // Frames entre tubos
+            let frame = 0;
+            let score = 0;
 
-pipe_width = 60
-pipe_gap = 150
-pipe_velocity = 4
-pipe_frequency = 1500  # Tiempo en milisegundos entre nuevos tubos
+            function createPipe() {
+                const pipeHeight = Math.random() * (canvas.height - pipeGap - 100) + 50;
+                pipes.push({ x: canvas.width, topHeight: pipeHeight, bottomY: pipeHeight + pipeGap });
+            }
 
-# Variables de puntuación
-score = 0
-high_score = 0
+            function drawBird() {
+                ctx.fillStyle = "blue";
+                ctx.fillRect(bird.x, bird.y, bird.width, bird.height);
+            }
 
-# Reloj para controlar la velocidad del juego
-clock = pygame.time.Clock()
+            function drawPipes() {
+                ctx.fillStyle = "green";
+                pipes.forEach(pipe => {
+                    ctx.fillRect(pipe.x, 0, pipeWidth, pipe.topHeight);
+                    ctx.fillRect(pipe.x, pipe.bottomY, pipeWidth, canvas.height - pipe.bottomY);
+                });
+            }
 
-# Grupo de tubos
-pipes = []
-last_pipe = pygame.time.get_ticks() - pipe_frequency  # Tiempo del último tubo
+            function updatePipes() {
+                pipes.forEach(pipe => pipe.x -= 4);
+                pipes.filter(pipe => pipe.x + pipeWidth > 0);
+                if (frame % pipeFrequency === 0) createPipe();
+            }
 
-# Función para dibujar al pájaro
-def draw_bird(bird_y):
-    pygame.draw.rect(screen, BLUE, [bird_x, bird_y, bird_width, bird_height])
+            function drawScore() {
+                ctx.fillStyle = "black";
+                ctx.font = "20px Arial";
+                ctx.fillText("Score: " + score, 10, 30);
+            }
 
-# Función para crear tubos
-def create_pipe():
-    pipe_height = random.randint(100, SCREEN_HEIGHT - pipe_gap - 100)
-    top_pipe = pygame.Rect(SCREEN_WIDTH, 0, pipe_width, pipe_height)
-    bottom_pipe = pygame.Rect(SCREEN_WIDTH, pipe_height + pipe_gap, pipe_width, SCREEN_HEIGHT - pipe_height - pipe_gap)
-    return top_pipe, bottom_pipe
+            function gameOver() {
+                ctx.fillStyle = "black";
+                ctx.font = "40px Arial";
+                ctx.fillText("Game Over", canvas.width / 4, canvas.height / 2);
+                cancelAnimationFrame(animationId);
+            }
 
-# Función para mover y dibujar tubos
-def move_pipes(pipes):
-    for pipe in pipes:
-        pipe.x -= pipe_velocity
-    return [pipe for pipe in pipes if pipe.x + pipe_width > 0]  # Filtra tubos fuera de la pantalla
+            let animationId;
 
-# Función para mostrar la puntuación
-def show_score(score):
-    font = pygame.font.SysFont(None, 35)
-    score_text = font.render("Score: " + str(score), True, BLACK)
-    screen.blit(score_text, [10, 10])
+            function gameLoop() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-# Función principal del juego
-def game_loop():
-    global bird_y, bird_velocity, score, pipes, last_pipe, high_score
-    
-    # Variables de inicio
-    game_over = False
-    bird_y = SCREEN_HEIGHT // 2
-    bird_velocity = 0
-    score = 0
-    pipes = []
-    
-    while not game_over:
-        # Manejo de eventos
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                return
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    bird_velocity = jump_strength  # Saltar con la barra espaciadora
-        
-        # Gravedad y movimiento del pájaro
-        bird_velocity += gravity
-        bird_y += bird_velocity
-        
-        # Generación de nuevos tubos
-        time_now = pygame.time.get_ticks()
-        if time_now - last_pipe > pipe_frequency:
-            pipes.extend(create_pipe())
-            last_pipe = time_now
-        
-        # Movimiento de tubos y detección de colisiones
-        pipes = move_pipes(pipes)
-        for pipe in pipes:
-            if pipe.colliderect(pygame.Rect(bird_x, bird_y, bird_width, bird_height)):
-                game_over = True
-        
-        # Comprobar si el pájaro toca el suelo o el techo
-        if bird_y < 0 or bird_y > SCREEN_HEIGHT - bird_height:
-            game_over = True
-        
-        # Comprobar si se pasa un tubo y actualizar puntuación
-        for pipe in pipes:
-            if pipe.x + pipe_width == bird_x:  # Al pasar el tubo, se suma un punto
-                score += 1
-                high_score = max(score, high_score)
+                bird.velocity += gravity;
+                bird.y += bird.velocity;
 
-        # Dibujar elementos del juego
-        screen.fill(WHITE)
-        draw_bird(bird_y)
-        for pipe in pipes:
-            pygame.draw.rect(screen, GREEN, pipe)
-        show_score(score)
-        
-        pygame.display.flip()
-        clock.tick(60)  # Control de FPS
+                drawBird();
+                updatePipes();
+                drawPipes();
+                drawScore();
 
-    # Mensaje de Game Over
-    font = pygame.font.SysFont(None, 55)
-    game_over_text = font.render("Game Over", True, BLACK)
-    screen.fill(WHITE)
-    screen.blit(game_over_text, [SCREEN_WIDTH // 4, SCREEN_HEIGHT // 3])
-    show_score(score)
-    pygame.display.flip()
-    
-    pygame.time.delay(2000)  # Retraso de 2 segundos para reiniciar
-    game_loop()  # Reiniciar el juego
+                // Detectar colisiones
+                if (bird.y < 0 || bird.y + bird.height > canvas.height) {
+                    gameOver();
+                    return;
+                }
+                pipes.forEach(pipe => {
+                    if (
+                        bird.x < pipe.x + pipeWidth &&
+                        bird.x + bird.width > pipe.x &&
+                        (bird.y < pipe.topHeight || bird.y + bird.height > pipe.bottomY)
+                    ) {
+                        gameOver();
+                        return;
+                    }
+                });
 
-# Ejecutar el juego
-game_loop()
+                frame++;
+                animationId = requestAnimationFrame(gameLoop);
+            }
+
+            // Control del pájaro
+            document.addEventListener("keydown", event => {
+                if (event.code === "Space") {
+                    bird.velocity = jumpStrength;
+                }
+            });
+
+            // Iniciar el juego
+            gameLoop();
+        </script>
+    </body>
+    </html>
+    """
+
+if __name__ == "__main__":
+    app.run(debug=True)
